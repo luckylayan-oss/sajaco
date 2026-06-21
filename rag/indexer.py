@@ -1,7 +1,7 @@
 """
 indexer.py
 -----------
-Reads documents from the 'documents/' folder,
+Reads documents from the 'documents/' folder (and ALL subfolders),
 splits them into chunks, creates embeddings,
 and saves them into a ChromaDB vector database.
 
@@ -29,34 +29,43 @@ EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 
 def load_documents(folder_path):
-    """Walk through folder and load all supported files."""
+    """Walk through folder AND all subfolders to load supported files."""
     documents = []
-    print(f"\n📂 Scanning folder: {folder_path}")
+    print(f"\n📂 Scanning folder (including subfolders): {folder_path}")
 
-    for filename in os.listdir(folder_path):
-        file_path = os.path.join(folder_path, filename)
+    # os.walk goes through every folder and subfolder
+    for root, dirs, files in os.walk(folder_path):
+        for filename in files:
+            file_path = os.path.join(root, filename)
+            # Show relative path for cleaner output
+            rel_path = os.path.relpath(file_path, folder_path)
 
-        try:
-            if filename.lower().endswith(".pdf"):
-                loader = PyPDFLoader(file_path)
-                documents.extend(loader.load())
-                print(f"  ✅ Loaded PDF: {filename}")
+            try:
+                if filename.lower().endswith(".pdf"):
+                    loader = PyPDFLoader(file_path)
+                    documents.extend(loader.load())
+                    print(f"  ✅ Loaded PDF: {rel_path}")
 
-            elif filename.lower().endswith(".txt"):
-                loader = TextLoader(file_path, encoding="utf-8")
-                documents.extend(loader.load())
-                print(f"  ✅ Loaded TXT: {filename}")
+                elif filename.lower().endswith(".txt"):
+                    loader = TextLoader(file_path, encoding="utf-8")
+                    documents.extend(loader.load())
+                    print(f"  ✅ Loaded TXT: {rel_path}")
 
-            elif filename.lower().endswith(".docx"):
-                loader = Docx2txtLoader(file_path)
-                documents.extend(loader.load())
-                print(f"  ✅ Loaded DOCX: {filename}")
+                elif filename.lower().endswith((".md", ".markdown")):
+                    loader = TextLoader(file_path, encoding="utf-8")
+                    documents.extend(loader.load())
+                    print(f"  ✅ Loaded MD:  {rel_path}")
 
-            else:
-                print(f"  ⏭️  Skipped (unsupported): {filename}")
+                elif filename.lower().endswith(".docx"):
+                    loader = Docx2txtLoader(file_path)
+                    documents.extend(loader.load())
+                    print(f"  ✅ Loaded DOCX: {rel_path}")
 
-        except Exception as e:
-            print(f"  ❌ Error loading {filename}: {e}")
+                else:
+                    print(f"  ⏭️  Skipped (unsupported): {rel_path}")
+
+            except Exception as e:
+                print(f"  ❌ Error loading {rel_path}: {e}")
 
     return documents
 
