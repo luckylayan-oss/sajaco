@@ -13,8 +13,8 @@ Run: python rag/chatbot.py
 """
 
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
-from langchain_community.llms import Ollama
+from langchain_chroma import Chroma
+from langchain_ollama import OllamaLLM
 
 
 # ---------- CONFIG ----------
@@ -26,7 +26,6 @@ MEMORY_TURNS = 5
 # ----------------------------
 
 
-# 🪄 Ultra-simple rewrite prompt — only sees the LAST question
 REWRITE_PROMPT = """The user previously asked this question:
 "{last_question}"
 
@@ -39,7 +38,6 @@ Follow-up: {question}
 Rewritten:"""
 
 
-# 🤖 Main answering prompt
 ANSWER_PROMPT = """You are a precise assistant for SAJACO precast factory. You answer questions using ONLY the provided context.
 
 STRICT RULES:
@@ -61,7 +59,6 @@ USER'S QUESTION: {question}
 YOUR ANSWER:"""
 
 
-# Pronouns that signal a follow-up question needs rewriting
 PRONOUNS = [
     " their ", " their?", " they ", " they?",
     " them ", " them?", " it ", " it?",
@@ -88,7 +85,7 @@ def build_chatbot():
     )
 
     print(f"🤖 Loading LLM: {LLM_MODEL}...")
-    llm = Ollama(model=LLM_MODEL)
+    llm = OllamaLLM(model=LLM_MODEL)
 
     return vectordb, llm
 
@@ -125,11 +122,9 @@ def rewrite_question(question, chat_history, llm):
     if not chat_history:
         return question
 
-    # Skip rewriting if no pronouns
     if not needs_rewriting(question):
         return question
 
-    # Use ONLY the last question (no answer, no earlier turns) — zero ambiguity
     last_question = chat_history[-1][0]
 
     prompt = REWRITE_PROMPT.format(
@@ -142,7 +137,6 @@ def rewrite_question(question, chat_history, llm):
     except Exception:
         return question
 
-    # Safety checks
     if not rewritten or len(rewritten) > 200 or len(rewritten) < 5:
         return question
 
@@ -152,25 +146,20 @@ def rewrite_question(question, chat_history, llm):
 
 def answer_question(question, vectordb, llm, chat_history):
     """Search docs + ask LLM (with memory + smart query rewriting)."""
-    # 1. 🪄 Rewrite the question to be standalone (only if needed)
     search_query = rewrite_question(question, chat_history, llm)
     print(f"   🔍 Searching for: {search_query}")
 
-    # 2. Find relevant chunks using the rewritten query
     results = vectordb.similarity_search(search_query, k=TOP_K)
 
-    # 3. Format context + history
     context = format_context(results)
     history = format_history(chat_history)
 
-    # 4. Build the answering prompt
     prompt = ANSWER_PROMPT.format(
         history=history,
         context=context,
         question=question,
     )
 
-    # 5. Ask the LLM
     response = llm.invoke(prompt)
 
     return response, results
