@@ -56,5 +56,5 @@ Drop PDFs/TXT/DOCX files into the `documents/` folder.
 
 ## 👥 Team
 - Backend (RAG): [layan ]
-- Frontend: [front team]
+- Frontend: [jumanah, reham]
 - Docs: [docs team]
